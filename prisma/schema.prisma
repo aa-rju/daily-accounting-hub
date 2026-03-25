@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organisation {
+  id        String   @id @default(cuid())
+  name      String
+  plan      String   @default("free")  // "free" | "pro" | "business"
+  status    String   @default("active") // "active" | "suspended"
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+}
+
+model User {
+  id        String       @id @default(cuid())
+  email     String       @unique
+  password  String
+  name      String
+  role      String       @default("owner")  // "owner" | "accountant" | "viewer"
+  orgId     String?
+  org       Organisation? @relation(fields: [orgId], references: [id])
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Party {
+  id             String   @id @default(cuid())
+  name           String
+  phone          String
+  address        String
+  type           String   // "customer" | "supplier" | "both"
+  openingBalance Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Product {
+  id         String   @id @default(cuid())
+  name       String
+  category   String
+  unit       String
+  price      Float
+  trackStock Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Account {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // "cash" | "bank" | "wallet"
+  balance   Float    @default(0)
+  currency  String   @default("USD")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  billNumber    String        @unique
+  partyId       String
+  partyName     String
+  date          String
+  subtotal      Float
+  tax           Float         @default(0)
+  total         Float
+  paymentMethod String
+  status        String        @default("draft")
+  items         InvoiceItem[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String
+  productName String
+  quantity    Float
+  rate        Float
+  amount      Float
+}
+
+model Purchase {
+  id             String         @id @default(cuid())
+  purchaseNumber String         @unique
+  supplierId     String
+  supplierName   String
+  date           String
+  subtotal       Float
+  tax            Float          @default(0)
+  total          Float
+  paymentMethod  String
+  status         String         @default("draft")
+  items          PurchaseItem[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model PurchaseItem {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId   String
+  productName String
+  quantity    Float
+  rate        Float
+  amount      Float
+}
+
+model DailyReport {
+  id                  String   @id @default(cuid())
+  date                String   @unique
+  openingCashBalance  Float    @default(0)
+  bankDeposits        Float    @default(0)
+  advancesPaid        Float    @default(0)
+  cashReceived        Float    @default(0)
+  onlineBankTransfer  Float    @default(0)
+  creditSales         Float    @default(0)
+  totalExpenses       Float    @default(0)
+  totalIncome         Float    @default(0)
+  closingBalance      Float    @default(0)
+  expenses            Json     @default("[]")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model InventoryItem {
+  id           String   @id @default(cuid())
+  productId    String
+  productName  String
+  openingStock Float    @default(0)
+  production   Float    @default(0)
+  sales        Float    @default(0)
+  closingStock Float    @default(0)
+  date         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model LedgerEntry {
+  id          String   @id @default(cuid())
+  partyId     String
+  partyName   String
+  date        String
+  description String
+  debit       Float    @default(0)
+  credit      Float    @default(0)
+  balance     Float    @default(0)
+  type        String   // "invoice" | "purchase" | "payment" | "manual"
+  createdAt   DateTime @default(now())
+}
