@@ -1,0 +1,359 @@
+// ============================================================
+//  MHIS Accounting — Prisma Schema
+//  CA-reviewed + Production-ready
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+//  ORGANISATION (Multi-tenancy root)
+// ─────────────────────────────────────────────
+model Organisation {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  logo        String?
+  currency    String   @default("BDT")
+  fiscalYear  String   @default("JAN-DEC") // "JAN-DEC" | "APR-MAR" | "JUL-JUN"
+  plan        String   @default("free")    // "free" | "pro" | "business"
+  status      String   @default("active")  // "active" | "suspended"
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users          User[]
+  parties        Party[]
+  products       Product[]
+  accounts       Account[]
+  invoices       Invoice[]
+  purchases      Purchase[]
+  expenses       Expense[]
+  payments       Payment[]
+  dailyReports   DailyReport[]
+  stockMovements StockMovement[]
+  ledgerEntries  LedgerEntry[]
+  settings       Settings?
+}
+
+// ─────────────────────────────────────────────
+//  USER
+// ─────────────────────────────────────────────
+model User {
+  id        String        @id @default(cuid())
+  email     String        @unique
+  password  String
+  name      String
+  phone     String?
+  role      String        @default("owner") // "owner" | "accountant" | "viewer"
+  status    String        @default("active")
+  orgId     String?
+  org       Organisation? @relation(fields: [orgId], references: [id])
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+// ─────────────────────────────────────────────
+//  SETTINGS (per org)
+// ─────────────────────────────────────────────
+model Settings {
+  id                String       @id @default(cuid())
+  orgId             String       @unique
+  org               Organisation @relation(fields: [orgId], references: [id])
+  invoicePrefix     String       @default("INV")
+  purchasePrefix    String       @default("PUR")
+  defaultTaxRate    Float        @default(0)
+  enableStock       Boolean      @default(true)
+  enableLedger      Boolean      @default(true)
+  enableDailyReport Boolean      @default(true)
+  lowStockThreshold Float        @default(10)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+// ─────────────────────────────────────────────
+//  PARTY (Customer / Supplier / Both)
+// ─────────────────────────────────────────────
+model Party {
+  id             String       @id @default(cuid())
+  orgId          String
+  org            Organisation @relation(fields: [orgId], references: [id])
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  type           String       // "customer" | "supplier" | "both"
+  openingBalance Float        @default(0)
+  // positive = they owe us (receivable), negative = we owe them (payable)
+  currentBalance Float        @default(0)
+  creditLimit    Float?
+  notes          String?
+  status         String       @default("active") // "active" | "inactive"
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  invoices      Invoice[]
+  purchases     Purchase[]
+  payments      Payment[]
+  ledgerEntries LedgerEntry[]
+}
+
+// ─────────────────────────────────────────────
+//  PRODUCT
+// ─────────────────────────────────────────────
+model Product {
+  id           String       @id @default(cuid())
+  orgId        String
+  org          Organisation @relation(fields: [orgId], references: [id])
+  name         String
+  sku          String?
+  category     String
+  unit         String       // "kg" | "pcs" | "ltr" etc.
+  salePrice    Float        // selling price
+  costPrice    Float        @default(0)
+  trackStock   Boolean      @default(false)
+  currentStock Float        @default(0)
+  lowStockQty  Float        @default(0)
+  taxRate      Float        @default(0)
+  notes        String?
+  status       String       @default("active")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  invoiceItems   InvoiceItem[]
+  purchaseItems  PurchaseItem[]
+  stockMovements StockMovement[]
+}
+
+// ─────────────────────────────────────────────
+//  ACCOUNT (Cash / Bank / Wallet etc.)
+// ─────────────────────────────────────────────
+model Account {
+  id             String       @id @default(cuid())
+  orgId          String
+  org            Organisation @relation(fields: [orgId], references: [id])
+  name           String
+  type           String       // "cash" | "bank" | "mobile_wallet" | "credit_card" | "other"
+  accountNumber  String?
+  bankName       String?
+  openingBalance Float        @default(0)
+  balance        Float        @default(0)
+  currency       String       @default("BDT")
+  status         String       @default("active")
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  paymentsFrom Payment[] @relation("PaymentFromAccount")
+  paymentsTo   Payment[] @relation("PaymentToAccount")
+}
+
+// ─────────────────────────────────────────────
+//  INVOICE (Sales)
+// ─────────────────────────────────────────────
+model Invoice {
+  id            String        @id @default(cuid())
+  orgId         String
+  org           Organisation  @relation(fields: [orgId], references: [id])
+  billNumber    String
+  partyId       String
+  party         Party         @relation(fields: [partyId], references: [id])
+  partyName     String
+  date          DateTime
+  dueDate       DateTime?
+  subtotal      Float
+  discountAmt   Float         @default(0)
+  taxAmt        Float         @default(0)
+  total         Float
+  paidAmount    Float         @default(0)
+  dueAmount     Float         @default(0)
+  paymentMethod String        @default("cash")
+  status        String        @default("unpaid") // "unpaid" | "partial" | "paid" | "cancelled"
+  notes         String?
+  items         InvoiceItem[]
+  payments      Payment[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([orgId, billNumber])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  productName String
+  quantity    Float
+  rate        Float
+  costPrice   Float   @default(0)
+  discount    Float   @default(0)
+  taxRate     Float   @default(0)
+  amount      Float
+}
+
+// ─────────────────────────────────────────────
+//  PURCHASE
+// ─────────────────────────────────────────────
+model Purchase {
+  id             String         @id @default(cuid())
+  orgId          String
+  org            Organisation   @relation(fields: [orgId], references: [id])
+  purchaseNumber String
+  supplierId     String
+  supplier       Party          @relation(fields: [supplierId], references: [id])
+  supplierName   String
+  date           DateTime
+  dueDate        DateTime?
+  subtotal       Float
+  discountAmt    Float          @default(0)
+  taxAmt         Float          @default(0)
+  total          Float
+  paidAmount     Float          @default(0)
+  dueAmount      Float          @default(0)
+  paymentMethod  String         @default("cash")
+  status         String         @default("unpaid") // "unpaid" | "partial" | "paid" | "cancelled"
+  notes          String?
+  items          PurchaseItem[]
+  payments       Payment[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([orgId, purchaseNumber])
+}
+
+model PurchaseItem {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  productName String
+  quantity    Float
+  rate        Float
+  discount    Float    @default(0)
+  taxRate     Float    @default(0)
+  amount      Float
+}
+
+// ─────────────────────────────────────────────
+//  PAYMENT (all money movements)
+// ─────────────────────────────────────────────
+model Payment {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organisation @relation(fields: [orgId], references: [id])
+  partyId       String?
+  party         Party?       @relation(fields: [partyId], references: [id])
+  invoiceId     String?
+  invoice       Invoice?     @relation(fields: [invoiceId], references: [id])
+  purchaseId    String?
+  purchase      Purchase?    @relation(fields: [purchaseId], references: [id])
+  fromAccountId String?
+  fromAccount   Account?     @relation("PaymentFromAccount", fields: [fromAccountId], references: [id])
+  toAccountId   String?
+  toAccount     Account?     @relation("PaymentToAccount", fields: [toAccountId], references: [id])
+  date          DateTime
+  amount        Float
+  type          String       // "receipt" | "payment" | "transfer" | "expense"
+  method        String       @default("cash")
+  reference     String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+// ─────────────────────────────────────────────
+//  EXPENSE
+// ─────────────────────────────────────────────
+model Expense {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organisation @relation(fields: [orgId], references: [id])
+  date        DateTime
+  category    String       // "rent" | "salary" | "utilities" | "transport" | "misc"
+  description String
+  amount      Float
+  accountId   String?
+  reference   String?
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// ─────────────────────────────────────────────
+//  DAILY REPORT
+// ─────────────────────────────────────────────
+model DailyReport {
+  id                 String       @id @default(cuid())
+  orgId              String
+  org                Organisation @relation(fields: [orgId], references: [id])
+  date               DateTime
+  openingCashBalance Float        @default(0)
+  cashSales          Float        @default(0)
+  bankSales          Float        @default(0)
+  creditSales        Float        @default(0)
+  totalSales         Float        @default(0)
+  cashPurchases      Float        @default(0)
+  bankPurchases      Float        @default(0)
+  totalPurchases     Float        @default(0)
+  totalExpenses      Float        @default(0)
+  cashReceived       Float        @default(0)
+  cashPaid           Float        @default(0)
+  bankDeposits       Float        @default(0)
+  bankWithdrawals    Float        @default(0)
+  closingCashBalance Float        @default(0)
+  netProfit          Float        @default(0)
+  notes              String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@unique([orgId, date])
+}
+
+// ─────────────────────────────────────────────
+//  STOCK MOVEMENT (inventory audit trail)
+// ─────────────────────────────────────────────
+model StockMovement {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organisation @relation(fields: [orgId], references: [id])
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id])
+  date        DateTime
+  type        String       // "purchase" | "sale" | "adjustment" | "return" | "production"
+  quantity    Float        // positive = in, negative = out
+  balanceQty  Float        // running balance after movement
+  referenceId String?      // invoiceId or purchaseId
+  notes       String?
+  createdAt   DateTime     @default(now())
+}
+
+// ─────────────────────────────────────────────
+//  LEDGER ENTRY (double-entry bookkeeping)
+// ─────────────────────────────────────────────
+model LedgerEntry {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organisation @relation(fields: [orgId], references: [id])
+  partyId     String?
+  party       Party?       @relation(fields: [partyId], references: [id])
+  date        DateTime
+  description String
+  debit       Float        @default(0)
+  credit      Float        @default(0)
+  balance     Float        @default(0)
+  type        String       // "invoice" | "purchase" | "payment" | "expense" | "journal"
+  referenceId String?
+  notes       String?
+  createdAt   DateTime     @default(now())
+}
