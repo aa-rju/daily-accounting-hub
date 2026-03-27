@@ -30,6 +30,7 @@ const plans = [
 ];
 
 export default function Register() {
+  const API_URL = "http://localhost:3001";
   const navigate = useNavigate();
   const { login } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
@@ -68,7 +69,8 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/register", {
+
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
