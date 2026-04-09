@@ -1,12 +1,13 @@
 /**
  * server/routes/auth.ts
- * POST /api/auth/register
- * POST /api/auth/login
- * POST /api/auth/logout
- * GET  /api/auth/me
  *
- * KEY FIX: JWT now contains { userId, orgId } so every downstream
- * route can read req.user.orgId for multi-tenancy isolation.
+ * KEY FIXES:
+ * 1. login() now reads user.orgId and puts it in the JWT
+ * 2. register() creates org → user → seeds Cash account (all linked to orgId)
+ * 3. me() returns orgId so frontend can store it
+ *
+ * This is the single most important fix for multi-tenancy.
+ * Without orgId in the JWT, every request has no idea which tenant it is.
  */
 
 import "dotenv/config";
@@ -18,9 +19,11 @@ import { prisma } from "../db";
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES = "7d";
 
-// ─────────────────────────────────────────────
-//  REGISTER
-// ─────────────────────────────────────────────
+function signToken(userId: string, orgId: string, email: string) {
+  return jwt.sign({ userId, orgId, email }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+}
+
+// ── POST /api/auth/register ───────────────────────────────────
 export const register: RequestHandler = async (req, res) => {
   const { name, email, password, companyName, plan } = req.body;
 
@@ -30,7 +33,7 @@ export const register: RequestHandler = async (req, res) => {
   }
 
   try {
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await (prisma as any).user.findUnique({ where: { email } });
     if (existing) {
       res.status(409).json({ success: false, message: "Email already registered" });
       return;
@@ -38,55 +41,30 @@ export const register: RequestHandler = async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 12);
 
-    // ── Transaction: create org → user → link → seed settings + cash account ──
-    const result = await prisma.$transaction(async (tx: any) => {
-      // 1. Create org with temp ownerId
-      const org = await prisma.organisation.create({
-  data: {
-    name: companyName,
-    email:email,
-    plan: plan || "free",
-    status: "active",
-    ownerId: "temp",
-  },
-});
-
-      // 2. Create the owner user linked to the org
-      const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashed,
-        role: "owner",
-        status: "active",
-        orgId: org.id,
-      },
+    // Single transaction: org → user → fix ownerId → seed Cash account
+    const result = await (prisma as any).$transaction(async (tx: any) => {
+      const org = await tx.organisation.create({
+        data: { name: companyName, plan: plan || "free", status: "active", ownerId: "temp" },
       });
 
-      // 3. Update org.ownerId now that we have the user id
+      const user = await tx.user.create({
+        data: { name, email, password: hashed, role: "owner", orgId: org.id },
+      });
+
       await tx.organisation.update({
         where: { id: org.id },
         data: { ownerId: user.id },
       });
 
-      // 4. Seed default Settings
-      await tx.settings.create({
-        data: { orgId: org.id },
-      });
-
-      // 5. Seed a Cash account
+      // Seed a default Cash account for this org
       await tx.account.create({
-        data: { orgId: org.id, name: "Cash", type: "cash", balance: 0, openingBalance: 0 },
+        data: { orgId: org.id, name: "Cash", type: "cash", balance: 0, currency: "NPR" },
       });
 
       return { user, org };
     });
 
-    const token = jwt.sign(
-      { userId: result.user.id, orgId: result.org.id, email: result.user.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
-    );
+    const token = signToken(result.user.id, result.org.id, result.user.email);
 
     res.status(201).json({
       success: true,
@@ -96,10 +74,9 @@ export const register: RequestHandler = async (req, res) => {
         id: result.user.id,
         email: result.user.email,
         name: result.user.name,
-        role: result.user.role,
         orgId: result.org.id,
+        orgName: result.org.name,
       },
-      org: { id: result.org.id, name: result.org.name, plan: result.org.plan },
     });
   } catch (error) {
     console.error("Register error:", error);
@@ -107,9 +84,8 @@ export const register: RequestHandler = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-//  LOGIN
-// ─────────────────────────────────────────────
+// ── POST /api/auth/login ──────────────────────────────────────
+// THE CRITICAL FIX: orgId is now included in the JWT
 export const login: RequestHandler = async (req, res) => {
   const { email, password } = req.body;
 
@@ -119,37 +95,34 @@ export const login: RequestHandler = async (req, res) => {
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { org: true },
-    });
+    const user = await (prisma as any).user.findUnique({ where: { email } });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       res.status(401).json({ success: false, message: "Invalid email or password" });
       return;
     }
 
-    // if (user.status !== "active") {
-    //   res.status(403).json({ success: false, message: "Account is suspended" });
-    //   return;
-    // }
-    if (user.status !== "active" || user.org?.status !== "active") {
-  return res.status(403).json({ success: false, message: "Account is suspended" });
-}
-
-    const orgId = user.orgId ?? "default";
-
-    // ── Ensure Settings row exists (safety net for old accounts) ──
-    const settingsExist = await prisma.settings.findUnique({ where: { orgId } });
-    if (!settingsExist && orgId !== "default") {
-      await prisma.settings.create({ data: { orgId } });
+    if (user.status === "suspended") {
+      res.status(403).json({ success: false, message: "Account is suspended" });
+      return;
     }
 
-    const token = jwt.sign(
-      { userId: user.id, orgId, email: user.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
-    );
+    if (!user.orgId) {
+      res.status(403).json({
+        success: false,
+        message: "No organisation linked to this account. Please contact support.",
+      });
+      return;
+    }
+
+    // Fetch org name to return to client
+    const org = await (prisma as any).organisation.findUnique({
+      where: { id: user.orgId },
+      select: { id: true, name: true, plan: true },
+    });
+
+    // ✅ orgId is in the token — this is the fix
+    const token = signToken(user.id, user.orgId, user.email);
 
     res.json({
       success: true,
@@ -159,8 +132,9 @@ export const login: RequestHandler = async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
-        orgId,
+        orgId: user.orgId,
+        orgName: org?.name ?? "",
+        plan: org?.plan ?? "free",
       },
     });
   } catch (error) {
@@ -169,28 +143,37 @@ export const login: RequestHandler = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-//  LOGOUT  (stateless JWT — client drops the token)
-// ─────────────────────────────────────────────
+// ── POST /api/auth/logout ─────────────────────────────────────
 export const logout: RequestHandler = (_req, res) => {
   res.json({ success: true, message: "Logged out successfully" });
 };
 
-// ─────────────────────────────────────────────
-//  ME
-// ─────────────────────────────────────────────
+// ── GET /api/auth/me ──────────────────────────────────────────
 export const me: RequestHandler = async (req: any, res) => {
   try {
-    const user = await prisma.user.findUnique({
+    const user = await (prisma as any).user.findUnique({
       where: { id: req.user.userId },
       select: { id: true, email: true, name: true, role: true, orgId: true },
     });
+
     if (!user) {
       res.status(404).json({ success: false, message: "User not found" });
       return;
     }
-    res.json({ success: true, message: "Success", data: user });
-  } catch (error) {
+
+    const org = user.orgId
+      ? await (prisma as any).organisation.findUnique({
+          where: { id: user.orgId },
+          select: { name: true, plan: true },
+        })
+      : null;
+
+    res.json({
+      success: true,
+      message: "Success",
+      data: { ...user, orgName: org?.name ?? "", plan: org?.plan ?? "free" },
+    });
+  } catch {
     res.status(500).json({ success: false, message: "Something went wrong" });
   }
 };

@@ -21,7 +21,7 @@ const emptyForm = {
   name: "",
   type: "Cash" as string,
   openingBalance: "",
-  currency: "BDT",
+  currency: "Rs. ",
   notes: "",
 };
 
@@ -187,7 +187,7 @@ export default function Accounts() {
           <div className="bg-green-50 border border-green-100 rounded-lg p-6">
             <p className="text-sm text-muted-foreground font-medium">Total Balance</p>
             <p className="text-3xl font-bold text-green-700 mt-2">
-              ৳{totalBalance.toLocaleString()}
+              Rs. {totalBalance.toLocaleString()}
             </p>
           </div>
         </div>
@@ -242,7 +242,7 @@ export default function Accounts() {
                   <Select value={formData.currency} onValueChange={v => handleSelectChange(v, "currency")}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="BDT">BDT (৳)</SelectItem>
+                      <SelectItem value="Rs. ">NRP(Rs)</SelectItem>
                       <SelectItem value="USD">USD ($)</SelectItem>
                       <SelectItem value="EUR">EUR (€)</SelectItem>
                     </SelectContent>

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const categories = ["Building Materials", "Steel", "Electronics", "Chemicals", "Other"];
-const units = ["Bag", "Meter", "Kg", "Liter", "Piece", "Box", "Dozen"];
+const units = ["Bag", "Meter", "Kg", "Liter", "Piece", "Box", "Dozen","ton"];
 
 const emptyForm = {
   name: "",
@@ -270,7 +270,7 @@ export default function Products() {
                         <td className="px-6 py-4 text-sm text-muted-foreground">{product.category}</td>
                         <td className="px-6 py-4 text-sm text-muted-foreground">{product.unit}</td>
                         <td className="px-6 py-4 text-sm font-semibold text-right">
-                          ৳{product.price.toLocaleString()}
+                          Rs. {product.price.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-sm">
                           <span className={`px-2 py-1 rounded text-xs font-medium ${

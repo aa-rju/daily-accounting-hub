@@ -1,9 +1,7 @@
 // ============================================================
-//  Daily Accounting Hub — Prisma Schema
-//  Upgraded from base schema — fully backward compatible
-//  All new fields have defaults so existing data is safe
+//  Daily Accounting Hub — Prisma Schema (Post-Migration)
+//  Matches the Supabase DB after running migration.sql
 // ============================================================
-
 
 generator client {
   provider = "prisma-client-js"
@@ -13,35 +11,24 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─────────────────────────────────────────────
-//  ORGANISATION
-// ─────────────────────────────────────────────
 model Organisation {
   id        String   @id @default(cuid())
   name      String
-  email     String?
-  phone     String?
-  address   String?
-  currency  String   @default("BDT")
-  plan      String   @default("free")    // "free" | "pro" | "business"
-  status    String   @default("active")  // "active" | "suspended"
+  plan      String   @default("free")
+  status    String   @default("active")
   ownerId   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  users         User[]
-  settings      Settings?
+  users     User[]
+  settings  Settings?
 }
 
-// ─────────────────────────────────────────────
-//  USER
-// ─────────────────────────────────────────────
 model User {
   id        String        @id @default(cuid())
   email     String        @unique
   password  String
   name      String
-  role      String        @default("owner") // "owner" | "accountant" | "viewer"
+  role      String        @default("owner")
   status    String        @default("active")
   orgId     String?
   org       Organisation? @relation(fields: [orgId], references: [id])
@@ -49,120 +36,90 @@ model User {
   updatedAt DateTime      @updatedAt
 }
 
-// ─────────────────────────────────────────────
-//  SETTINGS (per org — one row per org)
-// ─────────────────────────────────────────────
+// ── New: Settings per organisation ───────────────────────────
 model Settings {
   id                String       @id @default(cuid())
   orgId             String       @unique
-  org               Organisation @relation(fields: [orgId], references: [id])
+  org               Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
   invoicePrefix     String       @default("INV")
   purchasePrefix    String       @default("PUR")
-  defaultTaxRate    Float        @default(0)
-  currency          String       @default("BDT")
+  defaultTaxRate    Float        @default(13)
+  currency          String       @default("NPR")
+  currencySymbol    String       @default("रू")
+  lowStockThreshold Float        @default(10)
   enableStock       Boolean      @default(true)
   enableLedger      Boolean      @default(true)
-  enableDailyReport Boolean      @default(true)
-  lowStockThreshold Float        @default(10)
+  fiscalYearStart   String       @default("07-16")
+  orgName           String?
+  orgPhone          String?
+  orgEmail          String?
+  orgAddress        String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 }
 
-// ─────────────────────────────────────────────
-//  PARTY (Customer / Supplier / Both)
-// ─────────────────────────────────────────────
 model Party {
   id             String   @id @default(cuid())
-  orgId          String   @default("default") // multi-tenancy
+  orgId          String
   name           String
   phone          String   @default("")
-  email          String?
   address        String   @default("")
-  type           String   // "customer" | "supplier" | "both"
+  type           String
   openingBalance Float    @default(0)
-  currentBalance Float    @default(0) // live running balance
-  creditLimit    Float?
-  notes          String?
-  status         String   @default("active") // "active" | "inactive"
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  invoices      Invoice[]
-  purchases     Purchase[]
-  ledgerEntries LedgerEntry[]
+  @@index([orgId])
 }
 
-// ─────────────────────────────────────────────
-//  PRODUCT
-// ─────────────────────────────────────────────
 model Product {
-  id           String   @id @default(cuid())
-  orgId        String   @default("default")
-  name         String
-  sku          String?
-  category     String
-  unit         String
-  price        Float    // kept for backward compat (= salePrice)
-  salePrice    Float    @default(0)
-  costPrice    Float    @default(0)
-  trackStock   Boolean  @default(false)
-  currentStock Float    @default(0)
-  lowStockQty  Float    @default(0)
-  taxRate      Float    @default(0)
-  notes        String?
-  status       String   @default("active")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(cuid())
+  orgId      String
+  name       String
+  category   String
+  unit       String
+  price      Float
+  trackStock Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  invoiceItems   InvoiceItem[]
-  purchaseItems  PurchaseItem[]
-  stockMovements StockMovement[]
+  @@index([orgId])
 }
 
-// ─────────────────────────────────────────────
-//  ACCOUNT (Cash / Bank / Wallet)
-// ─────────────────────────────────────────────
 model Account {
-  id             String   @id @default(cuid())
-  orgId          String   @default("default")
-  name           String
-  type           String   // "cash" | "bank" | "wallet"
-  accountNumber  String?
-  bankName       String?
-  openingBalance Float    @default(0)
-  balance        Float    @default(0)
-  currency       String   @default("BDT")
-  status         String   @default("active")
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  type      String
+  balance   Float    @default(0)
+  currency  String   @default("NPR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
 }
 
-// ─────────────────────────────────────────────
-//  INVOICE (Sales)
-// ─────────────────────────────────────────────
 model Invoice {
   id            String        @id @default(cuid())
-  orgId         String        @default("default")
-  billNumber    String        @unique
+  orgId         String
+  billNumber    String
   partyId       String
-  party         Party         @relation(fields: [partyId], references: [id])
   partyName     String
   date          String
-  dueDate       String?
   subtotal      Float
-  discountAmt   Float         @default(0)
-  tax           Float         @default(0)    // kept for compat
-  taxAmt        Float         @default(0)
+  tax           Float         @default(0)
   total         Float
   paidAmount    Float         @default(0)
   dueAmount     Float         @default(0)
-  paymentMethod String        @default("cash")
-  status        String        @default("draft") // "draft"|"sent"|"paid"|"partial"|"cancelled"
+  paymentMethod String
+  status        String        @default("sent")
   notes         String?
   items         InvoiceItem[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  @@unique([orgId, billNumber])
+  @@index([orgId])
 }
 
 model InvoiceItem {
@@ -170,41 +127,33 @@ model InvoiceItem {
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   productId   String
-  product     Product @relation(fields: [productId], references: [id])
   productName String
   quantity    Float
   rate        Float
-  costPrice   Float   @default(0)
-  discount    Float   @default(0)
-  taxRate     Float   @default(0)
   amount      Float
 }
 
-// ─────────────────────────────────────────────
-//  PURCHASE
-// ─────────────────────────────────────────────
 model Purchase {
   id             String         @id @default(cuid())
-  orgId          String         @default("default")
-  purchaseNumber String         @unique
+  orgId          String
+  purchaseNumber String
   supplierId     String
-  supplier       Party          @relation(fields: [supplierId], references: [id])
   supplierName   String
   date           String
-  dueDate        String?
   subtotal       Float
-  discountAmt    Float          @default(0)
-  tax            Float          @default(0)   // kept for compat
-  taxAmt         Float          @default(0)
+  tax            Float          @default(0)
   total          Float
   paidAmount     Float          @default(0)
   dueAmount      Float          @default(0)
-  paymentMethod  String         @default("cash")
-  status         String         @default("draft") // "draft"|"received"|"paid"|"partial"|"cancelled"
+  paymentMethod  String
+  status         String         @default("received")
   notes          String?
   items          PurchaseItem[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+
+  @@unique([orgId, purchaseNumber])
+  @@index([orgId])
 }
 
 model PurchaseItem {
@@ -212,39 +161,16 @@ model PurchaseItem {
   purchaseId  String
   purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   productId   String
-  product     Product  @relation(fields: [productId], references: [id])
   productName String
   quantity    Float
   rate        Float
-  discount    Float    @default(0)
-  taxRate     Float    @default(0)
   amount      Float
 }
 
-// ─────────────────────────────────────────────
-//  STOCK MOVEMENT (inventory audit trail)
-// ─────────────────────────────────────────────
-model StockMovement {
-  id          String   @id @default(cuid())
-  orgId       String   @default("default")
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  date        String
-  type        String   // "purchase" | "sale" | "adjustment" | "return"
-  quantity    Float    // positive = in, negative = out
-  balanceQty  Float    // running balance after this movement
-  referenceId String?  // invoiceId or purchaseId
-  notes       String?
-  createdAt   DateTime @default(now())
-}
-
-// ─────────────────────────────────────────────
-//  DAILY REPORT
-// ─────────────────────────────────────────────
 model DailyReport {
   id                 String   @id @default(cuid())
-  orgId              String   @default("default")
-  date               String   @unique
+  orgId              String
+  date               String
   openingCashBalance Float    @default(0)
   bankDeposits       Float    @default(0)
   advancesPaid       Float    @default(0)
@@ -255,23 +181,16 @@ model DailyReport {
   totalIncome        Float    @default(0)
   closingBalance     Float    @default(0)
   expenses           Json     @default("[]")
-  // Extended fields for richer reports
-  cashSales          Float    @default(0)
-  bankSales          Float    @default(0)
-  totalSales         Float    @default(0)
-  totalPurchases     Float    @default(0)
-  netProfit          Float    @default(0)
-  notes              String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  @@unique([orgId, date])
+  @@index([orgId])
 }
 
-// ─────────────────────────────────────────────
-//  INVENTORY ITEM (daily production/sales log)
-// ─────────────────────────────────────────────
 model InventoryItem {
   id           String   @id @default(cuid())
-  orgId        String   @default("default")
+  orgId        String
   productId    String
   productName  String
   openingStock Float    @default(0)
@@ -281,24 +200,23 @@ model InventoryItem {
   date         String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([orgId])
 }
 
-// ─────────────────────────────────────────────
-//  LEDGER ENTRY (double-entry bookkeeping)
-// ─────────────────────────────────────────────
 model LedgerEntry {
   id          String   @id @default(cuid())
-  orgId       String   @default("default")
+  orgId       String
   partyId     String
-  party       Party    @relation(fields: [partyId], references: [id])
   partyName   String
   date        String
   description String
   debit       Float    @default(0)
   credit      Float    @default(0)
-  balance     Float    @default(0) // running balance for this party
-  type        String   // "invoice" | "purchase" | "payment" | "manual"
-  referenceId String?
-  notes       String?
+  balance     Float    @default(0)
+  type        String
   createdAt   DateTime @default(now())
+
+  @@index([orgId])
+  @@index([orgId, partyId])
 }

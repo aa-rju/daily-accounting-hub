@@ -16,7 +16,10 @@ const adapter = new PrismaPg({
 });
 
 export const prisma = new PrismaClient({ adapter });
-
+export const ok = (data: any) => ({
+  success: true,
+  data,
+});
 // ─────────────────────────────────────────────
 //  HELPERS used across all route files
 // ─────────────────────────────────────────────

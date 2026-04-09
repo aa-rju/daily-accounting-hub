@@ -310,7 +310,7 @@ export default function Ledger() {
                     Total Debit
                   </p>
                   <p className="text-lg font-bold text-green-600 mt-2">
-                    ৳
+                    Rs. 
                     {calculatePartyTotals(currentLedger.entries).totalDebit.toLocaleString()}
                   </p>
                 </div>
@@ -325,7 +325,7 @@ export default function Ledger() {
                         : "text-red-600"
                     }`}
                   >
-                    ৳{calculatePartyBalance(currentLedger.entries).toLocaleString()}
+                    Rs. {calculatePartyBalance(currentLedger.entries).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -377,16 +377,16 @@ export default function Ledger() {
                           </td>
                           <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
                             {entry.debit > 0
-                              ? `৳${entry.debit.toLocaleString()}`
+                              ? `Rs. ${entry.debit.toLocaleString()}`
                               : "-"}
                           </td>
                           <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">
                             {entry.credit > 0
-                              ? `৳${entry.credit.toLocaleString()}`
+                              ? `Rs. ${entry.credit.toLocaleString()}`
                               : "-"}
                           </td>
                           <td className="px-6 py-4 text-sm text-right font-bold text-primary">
-                            ৳{entry.balance.toLocaleString()}
+                            Rs. {entry.balance.toLocaleString()}
                           </td>
                         </tr>
                       ))
@@ -406,19 +406,19 @@ export default function Ledger() {
                         TOTALS
                       </td>
                       <td className="px-6 py-4 text-sm text-right text-green-600">
-                        ৳
+                        Rs. 
                         {getFilteredEntries(currentLedger.entries)
                           .reduce((sum, e) => sum + e.debit, 0)
                           .toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-sm text-right text-red-600">
-                        ৳
+                        Rs. 
                         {getFilteredEntries(currentLedger.entries)
                           .reduce((sum, e) => sum + e.credit, 0)
                           .toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-sm text-right">
-                        ৳
+                        Rs. 
                         {calculatePartyBalance(
                           getFilteredEntries(currentLedger.entries)
                         ).toLocaleString()}
@@ -466,7 +466,7 @@ export default function Ledger() {
                               : "text-red-600"
                           }`}
                         >
-                          ৳
+                          Rs. 
                           {calculatePartyBalance(ledger.entries).toLocaleString()}
                         </p>
                       </div>
@@ -515,13 +515,13 @@ export default function Ledger() {
                                   {entry.description}
                                 </td>
                                 <td className="px-6 py-3 text-sm text-right text-green-600 font-medium">
-                                  {entry.debit > 0 ? `৳${entry.debit.toLocaleString()}` : "-"}
+                                  {entry.debit > 0 ? `Rs. ${entry.debit.toLocaleString()}` : "-"}
                                 </td>
                                 <td className="px-6 py-3 text-sm text-right text-red-600 font-medium">
-                                  {entry.credit > 0 ? `৳${entry.credit.toLocaleString()}` : "-"}
+                                  {entry.credit > 0 ? `Rs. ${entry.credit.toLocaleString()}` : "-"}
                                 </td>
                                 <td className="px-6 py-3 text-sm text-right font-bold text-primary">
-                                  ৳{entry.balance.toLocaleString()}
+                                  Rs. {entry.balance.toLocaleString()}
                                 </td>
                               </tr>
                             ))}

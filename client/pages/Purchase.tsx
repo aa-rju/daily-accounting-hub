@@ -208,19 +208,19 @@ export default function Purchase() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-6">
             <p className="text-sm text-muted-foreground font-medium">Total Purchases</p>
-            <p className="text-3xl font-bold text-blue-700 mt-2">৳{totalPurchaseValue.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-blue-700 mt-2">Rs. {totalPurchaseValue.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground mt-2">{purchases.length} purchases</p>
           </div>
           <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-6">
             <p className="text-sm text-muted-foreground font-medium">Pending Payment</p>
-            <p className="text-3xl font-bold text-yellow-700 mt-2">৳{totalPending.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-yellow-700 mt-2">Rs. {totalPending.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground mt-2">
               {purchases.filter(p => p.status !== "paid").length} pending
             </p>
           </div>
           <div className="bg-green-50 border border-green-100 rounded-lg p-6">
             <p className="text-sm text-muted-foreground font-medium">Paid Amount</p>
-            <p className="text-3xl font-bold text-green-700 mt-2">৳{totalPaid.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-green-700 mt-2">Rs. {totalPaid.toLocaleString()}</p>
           </div>
         </div>
 
@@ -311,7 +311,7 @@ export default function Purchase() {
                           <div>
                             <label className="block text-xs font-medium text-muted-foreground mb-1">Amount</label>
                             <div className="px-2 py-1 bg-white rounded border border-border text-sm font-medium">
-                              ৳{item.amount.toLocaleString()}
+                              Rs. {item.amount.toLocaleString()}
                             </div>
                           </div>
                         </div>
@@ -333,7 +333,7 @@ export default function Purchase() {
               <div className="bg-muted/30 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal:</span>
-                  <span className="font-semibold">৳{subtotal.toLocaleString()}</span>
+                  <span className="font-semibold">Rs{subtotal.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm border-t pt-2">
                   <div className="flex items-center gap-2">
@@ -344,11 +344,11 @@ export default function Purchase() {
                     />
                     <span>%</span>
                   </div>
-                  <span className="font-semibold">৳{tax.toLocaleString()}</span>
+                  <span className="font-semibold">Rs. {tax.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2">
                   <span>Total:</span>
-                  <span className="text-primary">৳{total.toLocaleString()}</span>
+                  <span className="text-primary">Rs. {total.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -433,7 +433,7 @@ export default function Purchase() {
                           {purchase.items.length}
                         </td>
                         <td className="px-6 py-4 text-sm font-semibold text-right">
-                          ৳{purchase.total.toLocaleString()}
+                          Rs. {purchase.total.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-sm">
                           <Select value={purchase.status}

@@ -1,77 +1,64 @@
+/**
+ * server/routes/accounts.ts — org-scoped
+ */
 import { RequestHandler } from "express";
-import { prisma, getOrgId, listResponse, okResponse } from "../db";
+import { prisma } from "../db";
 
 export const getAccounts: RequestHandler = async (req: any, res) => {
   try {
-    const orgId = getOrgId(req);
     const { page = 1, pageSize = 50 } = req.query;
-    const skip = (Number(page) - 1) * Number(pageSize);
+    const where = { orgId: req.user.orgId };
     const [data, total] = await Promise.all([
-      prisma.account.findMany({ where: { orgId }, skip, take: Number(pageSize), orderBy: { name: "asc" } }),
-      prisma.account.count({ where: { orgId } }),
+      (prisma as any).account.findMany({ where, skip: (Number(page)-1)*Number(pageSize), take: Number(pageSize), orderBy: { name: "asc" } }),
+      (prisma as any).account.count({ where }),
     ]);
-    res.json(listResponse(data, total, Number(page), Number(pageSize)));
+    const totalBalance = data.reduce((s: number, a: any) => s + a.balance, 0);
+    res.json({ success: true, message: "Accounts retrieved", data, total, page: Number(page), pageSize: Number(pageSize), totalBalance });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 };
 
 export const getAccount: RequestHandler = async (req: any, res) => {
   try {
-    const orgId = getOrgId(req);
-    const account = await prisma.account.findFirst({ where: { id: req.params.id, orgId } });
+    const account = await (prisma as any).account.findFirst({ where: { id: req.params.id, orgId: req.user.orgId } });
     if (!account) { res.status(404).json({ success: false, message: "Account not found" }); return; }
-    res.json(okResponse(account));
+    res.json({ success: true, message: "Account retrieved", data: account });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 };
 
 export const createAccount: RequestHandler = async (req: any, res) => {
   try {
-    const orgId = getOrgId(req);
-    const { name, type, openingBalance = 0, accountNumber, bankName, currency = "BDT", notes } = req.body;
+    const { name, type, openingBalance = 0, currency = "NPR" } = req.body;
     if (!name || !type) { res.status(400).json({ success: false, message: "name and type required" }); return; }
-    const account = await prisma.account.create({
-      data: {
-        orgId, name, type,
-        openingBalance: Number(openingBalance),
-        balance: Number(openingBalance),
-        accountNumber: accountNumber || null,
-        bankName: bankName || null,
-        currency, notes: notes || null,
-      },
+    const account = await (prisma as any).account.create({
+      data: { orgId: req.user.orgId, name, type, balance: Number(openingBalance), currency },
     });
-    res.status(201).json(okResponse(account, "Account created"));
+    res.status(201).json({ success: true, message: "Account created", data: account });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 };
 
 export const updateAccount: RequestHandler = async (req: any, res) => {
   try {
-    const orgId = getOrgId(req);
-    const existing = await prisma.account.findFirst({ where: { id: req.params.id, orgId } });
+    const existing = await (prisma as any).account.findFirst({ where: { id: req.params.id, orgId: req.user.orgId } });
     if (!existing) { res.status(404).json({ success: false, message: "Account not found" }); return; }
-    const { name, type, balance, openingBalance, accountNumber, bankName, currency, notes, status } = req.body;
-    const account = await prisma.account.update({
+    const { name, type, balance, currency } = req.body;
+    const account = await (prisma as any).account.update({
       where: { id: req.params.id },
       data: {
         ...(name !== undefined && { name }),
         ...(type !== undefined && { type }),
         ...(balance !== undefined && { balance: Number(balance) }),
-        ...(openingBalance !== undefined && { openingBalance: Number(openingBalance) }),
-        ...(accountNumber !== undefined && { accountNumber }),
-        ...(bankName !== undefined && { bankName }),
         ...(currency !== undefined && { currency }),
-        ...(notes !== undefined && { notes }),
-        ...(status !== undefined && { status }),
       },
     });
-    res.json(okResponse(account, "Account updated"));
+    res.json({ success: true, message: "Account updated", data: account });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 };
 
 export const deleteAccount: RequestHandler = async (req: any, res) => {
   try {
-    const orgId = getOrgId(req);
-    const existing = await prisma.account.findFirst({ where: { id: req.params.id, orgId } });
+    const existing = await (prisma as any).account.findFirst({ where: { id: req.params.id, orgId: req.user.orgId } });
     if (!existing) { res.status(404).json({ success: false, message: "Account not found" }); return; }
-    await prisma.account.update({ where: { id: req.params.id }, data: { status: "inactive" } });
-    res.json({ success: true, message: "Account deactivated", data: null });
+    await (prisma as any).account.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: "Account deleted", data: null });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 };

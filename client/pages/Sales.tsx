@@ -297,7 +297,7 @@ export default function Sales() {
                           <div>
                             <label className="block text-xs font-medium text-muted-foreground mb-1">Amount</label>
                             <div className="px-2 py-1 bg-white rounded border border-border text-sm font-medium">
-                              ৳{item.amount.toLocaleString()}
+                              Rs. {item.amount.toLocaleString()}
                             </div>
                           </div>
                         </div>
@@ -319,7 +319,7 @@ export default function Sales() {
               <div className="bg-muted/30 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal:</span>
-                  <span className="font-semibold">৳{subtotal.toLocaleString()}</span>
+                  <span className="font-semibold">Rs. {subtotal.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm border-t pt-2">
                   <div className="flex items-center gap-2">
@@ -330,11 +330,11 @@ export default function Sales() {
                     />
                     <span>%</span>
                   </div>
-                  <span className="font-semibold">৳{tax.toLocaleString()}</span>
+                  <span className="font-semibold">Rs. {tax.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2">
                   <span>Total:</span>
-                  <span className="text-primary">৳{total.toLocaleString()}</span>
+                  <span className="text-primary">Rs. {total.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -425,7 +425,7 @@ export default function Sales() {
                           {invoice.items.length}
                         </td>
                         <td className="px-6 py-4 text-sm font-semibold text-right">
-                          ৳{invoice.total.toLocaleString()}
+                          Rs. {invoice.total.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-sm">
                           <Select value={invoice.status}
